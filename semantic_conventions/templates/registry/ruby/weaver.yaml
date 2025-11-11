@@ -45,6 +45,16 @@ templates:
     file_name: "incubating/{{ctx.root_namespace | snake_case}}/metrics.rb"
     params:
       incubating: true
+  # SDK metrics (otel namespace, incubating)
+  - template: sdk_metrics.j2
+    application_mode: each
+    filter: >
+      semconv_grouped_metrics({
+        "include_root_namespace": ["otel"],
+        "exclude_stability": [],
+        "exclude_deprecated": false
+      })
+    file_name: "../metrics_sdk/lib/opentelemetry/sdk/metrics/otel_metrics.rb"
 
 default_comment_format: yard_doc
 comment_formats:
