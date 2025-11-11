@@ -9,7 +9,7 @@
 module OpenTelemetry
   module SDK
     module Metrics
-      module OtelMetrics
+      module OTelMetrics
         # @!group SDK Metrics
 
         # The number of log records for which the export has finished, either successful or failed.

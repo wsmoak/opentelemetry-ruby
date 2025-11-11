@@ -18,7 +18,7 @@
 module OpenTelemetry
   module SDK
     module Metrics
-      module OtelMetrics
+      module OTelMetrics
         # @!group SDK Metrics
       {% for metric in ctx.metrics %}
         {%- set const_name = metric.metric_name | screaming_snake_case %}
