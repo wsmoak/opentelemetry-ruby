@@ -63,6 +63,12 @@ module OpenTelemetry
             @log_records = []
             @pid = nil
             @thread = nil
+            @component_name = nil
+            @processed_counter = nil
+
+            # Initialize metrics
+            init_metrics(max_queue_size)
+
             reset_on_fork(restart_thread: start_thread_on_boot)
           end
 
@@ -185,9 +191,11 @@ module OpenTelemetry
           def export_batch(batch, timeout: @exporter_timeout_seconds)
             result_code = @export_mutex.synchronize { @exporter.export(batch, timeout: timeout) }
             report_result(result_code, batch)
+            emit_metrics(batch.size, result_code)
             result_code
           rescue StandardError => e
             report_result(FAILURE, batch)
+            emit_metrics(batch.size, FAILURE)
             OpenTelemetry.handle_error(exception: e, message: 'unexpected error in BatchLogRecordProcessor#export_batch')
           end
 
@@ -210,6 +218,59 @@ module OpenTelemetry
 
           def lock(&block)
             @mutex.synchronize(&block)
+          end
+
+          def init_metrics(max_queue_size)
+            @component_name = OpenTelemetry::SDK::InternalMetrics.register_processor_instance('batching_log_record_processor')
+            meter = OpenTelemetry::SDK::InternalMetrics.meter
+            return unless meter
+
+            # Create queue size observable counter
+            meter.create_up_down_counter(
+              name: OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_QUEUE_SIZE,
+              description: 'The number of log records in the queue of a given instance of an SDK log processor.',
+              unit: '{log_record}',
+              callbacks: [method(:queue_size_callback)]
+            )
+
+            # Create queue capacity observable counter
+            meter.create_up_down_counter(
+              name: OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_QUEUE_CAPACITY,
+              description: 'The maximum number of log records the queue of a given instance of an SDK Log Record processor can hold.',
+              unit: '{log_record}',
+              callbacks: [lambda { |_options|
+                [OpenTelemetry::SDK::Metrics::Observation.new(max_queue_size, attributes)]
+              }]
+            )
+
+            # Create processed counter
+            @processed_counter = meter.create_counter(
+              name: OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_PROCESSED,
+              description: 'The number of log records for which the processing has finished, either successful or failed.',
+              unit: '{log_record}'
+            )
+          rescue StandardError => e
+            OpenTelemetry.handle_error(exception: e, message: 'failed to initialize metrics in BatchLogRecordProcessor')
+          end
+
+          def queue_size_callback(_options)
+            current_size = lock { log_records.size }
+            [OpenTelemetry::SDK::Metrics::Observation.new(current_size, attributes)]
+          end
+
+          def attributes
+            { 'otel.component.name' => @component_name }
+          end
+
+          def emit_metrics(batch_size, result_code)
+            return unless @processed_counter
+
+            attrs = attributes.dup
+            attrs['error.type'] = result_code.to_s unless result_code == SUCCESS
+
+            @processed_counter.add(batch_size, attributes: attrs)
+          rescue StandardError => e
+            OpenTelemetry.handle_error(exception: e, message: 'failed to emit metrics in BatchLogRecordProcessor')
           end
         end
       end
