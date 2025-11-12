@@ -49,7 +49,9 @@ module OpenTelemetry
               raise ArgumentError,
                     "exporter #{exporter.inspect} does not appear to be a valid exporter"
             end
+            puts "We are in BatchLogRecordProcessor initialize"
 
+            OpenTelemetry.logger.debug('Creating BatchLogRecordProcessor')
             @exporter = exporter
             @exporter_timeout_seconds = exporter_timeout / 1000.0
             @mutex = Mutex.new
@@ -66,7 +68,7 @@ module OpenTelemetry
             @component_name = nil
             @processed_counter = nil
 
-            # Initialize metrics
+            OpenTelemetry.logger.debug('Initializing internal metrics for BatchLogRecordProcessor')
             init_metrics(max_queue_size)
 
             reset_on_fork(restart_thread: start_thread_on_boot)
@@ -221,6 +223,7 @@ module OpenTelemetry
           end
 
           def init_metrics(max_queue_size)
+            OpenTelemetry.logger.debug('Initializing metrics in BatchLogRecordProcessor')
             @component_name = OpenTelemetry::SDK::InternalMetrics.register_processor_instance('batching_log_record_processor')
             meter = OpenTelemetry::SDK::InternalMetrics.meter
             return unless meter

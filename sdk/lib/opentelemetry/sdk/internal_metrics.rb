@@ -32,7 +32,7 @@ module OpenTelemetry
         # Get the global meter provider (if available)
         #
         # @return [OpenTelemetry::SDK::Metrics::MeterProvider, nil]
-        def metrics_provider
+        def meter_provider
           # Try to get the global meter provider
           OpenTelemetry.meter_provider
         rescue StandardError
@@ -43,13 +43,12 @@ module OpenTelemetry
         #
         # @return [OpenTelemetry::Metrics::Meter, nil]
         def meter
-          return nil unless metrics_provider
+          return nil unless meter_provider
 
-          @meter ||= metrics_provider.meter(
-            name: 'opentelemetry-sdk',
-            version: OpenTelemetry::SDK::VERSION
-          )
-        end
+          @meter ||= meter_provider.meter(
+            'opentelemetry-sdk'
+                  )
+                       end
 
         private
 
