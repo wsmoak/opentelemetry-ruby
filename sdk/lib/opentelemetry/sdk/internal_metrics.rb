@@ -45,10 +45,8 @@ module OpenTelemetry
         def meter
           return nil unless meter_provider
 
-          @meter ||= meter_provider.meter(
-            'opentelemetry-sdk'
-                  )
-                       end
+          @meter ||= meter_provider.meter('opentelemetry-sdk')
+        end
 
         private
 

@@ -228,27 +228,26 @@ module OpenTelemetry
             meter = OpenTelemetry::SDK::InternalMetrics.meter
             return unless meter
 
-            # Create queue size observable counter
-            meter.create_up_down_counter(
-              name: OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_QUEUE_SIZE,
+            lqs = meter.create_observable_gauge(
+              OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_QUEUE_SIZE,
               description: 'The number of log records in the queue of a given instance of an SDK log processor.',
               unit: '{log_record}',
-              callbacks: [method(:queue_size_callback)]
+              callback: method(:queue_size_callback)
             )
+            lqs.add_attributes(attributes)
 
-            # Create queue capacity observable counter
-            meter.create_up_down_counter(
-              name: OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_QUEUE_CAPACITY,
+            lqc = meter.create_observable_gauge(
+  OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_QUEUE_CAPACITY,
               description: 'The maximum number of log records the queue of a given instance of an SDK Log Record processor can hold.',
               unit: '{log_record}',
-              callbacks: [lambda { |_options|
-                [OpenTelemetry::SDK::Metrics::Observation.new(max_queue_size, attributes)]
-              }]
+              callback: lambda { |*_options|
+              max_queue_size
+              }
             )
+            lqc.add_attributes(attributes)
 
-            # Create processed counter
             @processed_counter = meter.create_counter(
-              name: OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_PROCESSED,
+OpenTelemetry::SDK::Metrics::OTelMetrics::OTEL_SDK_PROCESSOR_LOG_PROCESSED,
               description: 'The number of log records for which the processing has finished, either successful or failed.',
               unit: '{log_record}'
             )
@@ -258,7 +257,7 @@ module OpenTelemetry
 
           def queue_size_callback(_options)
             current_size = lock { log_records.size }
-            [OpenTelemetry::SDK::Metrics::Observation.new(current_size, attributes)]
+            current_size
           end
 
           def attributes
